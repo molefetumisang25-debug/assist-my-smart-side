@@ -47,21 +47,28 @@ function DocumentsPage() {
     if (name.endsWith(".pdf")) {
       try {
         toast.info("Extracting PDF text…");
-        const pdfjs = await import(/* @vite-ignore */ "pdfjs-dist/build/pdf.mjs" as string);
-        const worker = await import(/* @vite-ignore */ "pdfjs-dist/build/pdf.worker.mjs?url" as string);
-        pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
+        const pdfjs = await import("pdfjs-dist");
+        // Use a bundled worker URL
+        const workerUrl = new URL(
+          "pdfjs-dist/build/pdf.worker.min.mjs",
+          import.meta.url,
+        ).toString();
+        pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
         const buf = await file.arrayBuffer();
         const doc = await pdfjs.getDocument({ data: buf }).promise;
         let out = "";
         for (let i = 1; i <= doc.numPages; i++) {
           const page = await doc.getPage(i);
           const content = await page.getTextContent();
-          out += content.items.map((it: { str?: string }) => it.str ?? "").join(" ") + "\n\n";
+          out +=
+            content.items
+              .map((it) => ("str" in it ? (it as { str: string }).str : ""))
+              .join(" ") + "\n\n";
         }
         setText(out.trim());
         toast.success(`Loaded ${doc.numPages} pages`);
       } catch (e) {
-        toast.error("PDF extraction not available — paste text manually.");
+        toast.error("PDF extraction failed — paste text manually.");
         console.error(e);
       }
       return;
