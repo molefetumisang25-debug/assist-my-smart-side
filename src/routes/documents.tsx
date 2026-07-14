@@ -47,10 +47,8 @@ function DocumentsPage() {
     if (name.endsWith(".pdf")) {
       try {
         toast.info("Extracting PDF text…");
-        // @ts-expect-error - dynamic import of ESM lib without types resolution
-        const pdfjs = await import("pdfjs-dist/build/pdf.mjs");
-        // @ts-expect-error - worker import
-        const worker = await import("pdfjs-dist/build/pdf.worker.mjs?url");
+        const pdfjs = await import(/* @vite-ignore */ "pdfjs-dist/build/pdf.mjs" as string);
+        const worker = await import(/* @vite-ignore */ "pdfjs-dist/build/pdf.worker.mjs?url" as string);
         pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
         const buf = await file.arrayBuffer();
         const doc = await pdfjs.getDocument({ data: buf }).promise;
