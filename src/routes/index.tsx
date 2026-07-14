@@ -54,7 +54,7 @@ function Index() {
       <section className="relative flex-1 overflow-hidden bg-hero">
         <div className="mx-auto flex max-w-6xl flex-col px-6 pb-16 pt-16 md:pt-24">
           <motion.div
-            initial={{ opacity: 0, y: 12 }}
+            initial={false}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, ease: "easeOut" }}
             className="max-w-3xl"
