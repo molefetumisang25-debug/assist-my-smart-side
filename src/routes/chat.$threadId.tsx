@@ -55,25 +55,18 @@ function ChatPage() {
   // Hydrate: pick or create thread based on URL
   useEffect(() => {
     const all = readThreads();
-    if (params.threadId === "new" || !all.find((t) => t.id === params.threadId)) {
-      const existingEmpty = all.find((t) => t.messages.length === 0);
-      const t = existingEmpty ?? createThread();
-      if (!existingEmpty) {
-        all.unshift(t);
-      }
-      setThreads(all);
-      setThreadId(t.id);
-      setInitial(t.messages);
-      setHydrated(true);
-      if (params.threadId !== t.id) {
-        navigate({ to: "/chat/$threadId", params: { threadId: t.id }, replace: true });
-      }
-    } else {
-      const t = all.find((x) => x.id === params.threadId)!;
-      setThreads(all);
-      setThreadId(t.id);
-      setInitial(t.messages);
-      setHydrated(true);
+    let t = all.find((x) => x.id === params.threadId);
+    if (!t) {
+      // reuse an existing empty thread if present, else create
+      t = all.find((x) => x.messages.length === 0) ?? createThread();
+      upsertThread(t);
+    }
+    setThreads(readThreads());
+    setThreadId(t.id);
+    setInitial(t.messages);
+    setHydrated(true);
+    if (params.threadId !== t.id) {
+      navigate({ to: "/chat/$threadId", params: { threadId: t.id }, replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.threadId]);
