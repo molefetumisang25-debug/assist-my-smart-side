@@ -38,6 +38,7 @@ import {
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/chat/$threadId")({
+  ssr: false,
   component: ChatPage,
 });
 
