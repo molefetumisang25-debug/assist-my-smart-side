@@ -235,14 +235,14 @@ function ChatPage() {
               )}
               {messages.map((m) => (
                 <Message key={m.id} from={m.role === "user" ? "user" : "assistant"}>
-                  <MessageContent variant={m.role === "user" ? "contained" : "flat"}>
+                  <MessageContent>
                     <MessageResponse>{getPlainText(m)}</MessageResponse>
                   </MessageContent>
                 </Message>
               ))}
               {status === "submitted" && (
                 <Message from="assistant">
-                  <MessageContent variant="flat">
+                  <MessageContent>
                     <Shimmer>Thinking…</Shimmer>
                   </MessageContent>
                 </Message>
