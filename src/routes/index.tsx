@@ -95,9 +95,9 @@ function Index() {
               return (
                 <motion.div
                   key={m.to}
-                  initial={{ opacity: 0, y: 20 }}
+                  initial={false}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 + i * 0.06, duration: 0.5 }}
+                  transition={{ delay: 0.05 + i * 0.05, duration: 0.4 }}
                 >
                   <Link
                     to={m.to}
