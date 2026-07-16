@@ -10,6 +10,12 @@ import {
   Download,
   Pencil,
   Sparkles,
+  Paperclip,
+  ImageIcon,
+  X as XIcon,
+  Copy,
+  Check,
+  FileText,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
@@ -25,6 +31,10 @@ import {
   PromptInputTextarea,
   PromptInputFooter,
   PromptInputSubmit,
+  PromptInputTools,
+  PromptInputButton,
+  PromptInputHeader,
+  usePromptInputAttachments,
 } from "@/components/ai-elements/prompt-input";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import {
@@ -51,12 +61,10 @@ function ChatPage() {
   const [initial, setInitial] = useState<UIMessage[]>([]);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
-  // Hydrate: pick or create thread based on URL
   useEffect(() => {
     const all = readThreads();
     let t = all.find((x) => x.id === params.threadId);
     if (!t) {
-      // reuse an existing empty thread if present, else create
       t = all.find((x) => x.messages.length === 0) ?? createThread();
       upsertThread(t);
     }
@@ -79,13 +87,11 @@ function ChatPage() {
     onError: (e) => toast.error(e.message || "Chat failed"),
   });
 
-  // Reset messages when switching threads
   useEffect(() => {
     setMessages(initial);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [threadId]);
 
-  // Persist messages
   useEffect(() => {
     if (!hydrated || !threadId) return;
     const current = readThreads().find((t) => t.id === threadId);
@@ -99,7 +105,6 @@ function ChatPage() {
     setThreads(readThreads());
   }, [messages, threadId, hydrated]);
 
-  // Focus composer
   useEffect(() => {
     inputRef.current?.focus();
   }, [threadId, status]);
@@ -223,15 +228,11 @@ function ChatPage() {
                 <ConversationEmptyState
                   icon={<Sparkles className="h-8 w-8 text-primary" />}
                   title="Start a conversation"
-                  description="Ask anything — from research questions to code. Responses stream in real-time."
+                  description="Ask anything, attach images or files, and copy or download replies."
                 />
               )}
               {messages.map((m) => (
-                <Message key={m.id} from={m.role === "user" ? "user" : "assistant"}>
-                  <MessageContent>
-                    <MessageResponse>{getPlainText(m)}</MessageResponse>
-                  </MessageContent>
-                </Message>
+                <MessageBubble key={m.id} m={m} />
               ))}
               {status === "submitted" && (
                 <Message from="assistant">
@@ -250,17 +251,28 @@ function ChatPage() {
           <div className="border-t border-border bg-background/80 p-3 backdrop-blur">
             <div className="mx-auto max-w-3xl">
               <PromptInput
+                accept="image/*,application/pdf,text/*,.md,.json,.csv,.docx,.xlsx,.pptx"
+                multiple
+                maxFiles={10}
+                maxFileSize={20 * 1024 * 1024}
+                onError={(e) => toast.error(e.message)}
                 onSubmit={(m) => {
                   const text = m.text?.trim();
-                  if (!text || isBusy) return;
-                  sendMessage({ text });
+                  if ((!text && (!m.files || m.files.length === 0)) || isBusy) return;
+                  sendMessage({ text: text || "", files: m.files });
                 }}
               >
+                <PromptInputHeader>
+                  <AttachmentsPreview />
+                </PromptInputHeader>
                 <PromptInputTextarea
                   ref={inputRef}
-                  placeholder="Message GETSMART…"
+                  placeholder="Message GETSMART… (drag, paste, or attach files)"
                 />
-                <PromptInputFooter className="justify-end">
+                <PromptInputFooter>
+                  <PromptInputTools>
+                    <AttachButton />
+                  </PromptInputTools>
                   <PromptInputSubmit status={status} />
                 </PromptInputFooter>
               </PromptInput>
@@ -269,6 +281,141 @@ function ChatPage() {
         </div>
       </div>
     </AppShell>
+  );
+}
+
+function AttachButton() {
+  const attachments = usePromptInputAttachments();
+  return (
+    <PromptInputButton
+      tooltip="Attach image or file"
+      onClick={() => attachments.openFileDialog()}
+    >
+      <Paperclip className="size-4" />
+    </PromptInputButton>
+  );
+}
+
+function AttachmentsPreview() {
+  const attachments = usePromptInputAttachments();
+  if (attachments.files.length === 0) return null;
+  return (
+    <div className="flex w-full flex-wrap gap-2">
+      {attachments.files.map((f) => {
+        const isImage = f.mediaType?.startsWith("image/");
+        return (
+          <div
+            key={f.id}
+            className="group relative flex items-center gap-2 rounded-md border border-border bg-secondary/60 p-1 pr-2 text-xs"
+          >
+            {isImage ? (
+              <img
+                src={f.url}
+                alt={f.filename ?? "attachment"}
+                className="h-10 w-10 rounded object-cover"
+              />
+            ) : (
+              <div className="flex h-10 w-10 items-center justify-center rounded bg-background">
+                <FileText className="h-4 w-4 text-muted-foreground" />
+              </div>
+            )}
+            <span className="max-w-[10rem] truncate">{f.filename ?? "file"}</span>
+            <button
+              type="button"
+              aria-label="Remove attachment"
+              onClick={() => attachments.remove(f.id)}
+              className="rounded p-0.5 hover:bg-background"
+            >
+              <XIcon className="h-3 w-3" />
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function MessageBubble({ m }: { m: UIMessage }) {
+  const [copied, setCopied] = useState(false);
+  const text = getPlainText(m);
+  const files = m.parts.filter(
+    (p): p is Extract<UIMessage["parts"][number], { type: "file" }> => p.type === "file",
+  );
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      toast.success("Copied to clipboard");
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      toast.error("Copy failed");
+    }
+  };
+
+  const download = () => {
+    const blob = new Blob([text], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `message-${m.id.slice(0, 8)}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <Message from={m.role === "user" ? "user" : "assistant"}>
+      <MessageContent>
+        {files.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {files.map((p, i) => {
+              const isImage = p.mediaType?.startsWith("image/");
+              return isImage ? (
+                <a key={i} href={p.url} target="_blank" rel="noreferrer">
+                  <img
+                    src={p.url}
+                    alt={p.filename ?? "attachment"}
+                    className="max-h-56 rounded-md border border-border object-cover"
+                  />
+                </a>
+              ) : (
+                <a
+                  key={i}
+                  href={p.url}
+                  download={p.filename ?? "file"}
+                  className="inline-flex items-center gap-2 rounded-md border border-border bg-background px-2 py-1 text-xs hover:bg-secondary"
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  {p.filename ?? "file"}
+                </a>
+              );
+            })}
+          </div>
+        )}
+        {text && <MessageResponse>{text}</MessageResponse>}
+        {text && (
+          <div className="mt-1 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+            <button
+              type="button"
+              onClick={copy}
+              aria-label="Copy message"
+              className="inline-flex items-center gap-1 rounded-md border border-border bg-background/60 px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground"
+            >
+              {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+              {copied ? "Copied" : "Copy"}
+            </button>
+            <button
+              type="button"
+              onClick={download}
+              aria-label="Download message"
+              className="inline-flex items-center gap-1 rounded-md border border-border bg-background/60 px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground"
+            >
+              <Download className="h-3 w-3" /> Download
+            </button>
+          </div>
+        )}
+      </MessageContent>
+    </Message>
   );
 }
 
